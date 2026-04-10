@@ -1,0 +1,36 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Channel {
+  id        String   @id @default(cuid())
+  name      String
+  channelId String
+  sport     String   @default("basketball")
+  createdAt DateTime @default(now())
+
+  @@unique([channelId])
+}
+
+model SeenVideo {
+  videoId     String   @id
+  title       String
+  processedAt DateTime
+  success     Boolean
+}
+
+model Analysis {
+  id          String   @id @default(cuid())
+  videoId     String
+  channelName String
+  videoUrl    String
+  payload     Json
+  processedAt DateTime @default(now())
+
+  @@index([processedAt])
+}

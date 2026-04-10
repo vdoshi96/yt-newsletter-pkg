@@ -4,6 +4,8 @@ Monitors YouTube channels, extracts transcripts, analyzes with Gemini, emails yo
 
 **Layout:** Python package in `src/yt_newsletter/`; `config.json`, `state.json`, and `history.json` live at the repository root (next to `pyproject.toml`).
 
+**Web controller (optional):** A **Next.js** dashboard lives in `web/` — deploy the `web` folder to **Vercel** for a browser UI (channels, dry-run tests, recap, cron-based polling). See [`web/README.md`](web/README.md).
+
 ## Setup (5 minutes)
 
 ### 1. Install dependencies
