@@ -1,0 +1,4 @@
+# Prefer: pip install -e .
+feedparser>=6.0
+youtube-transcript-api>=1.0.0
+google-generativeai>=0.8.0

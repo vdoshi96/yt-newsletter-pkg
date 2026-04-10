@@ -1,0 +1,43 @@
+# YouTube Fantasy Basketball Newsletter
+
+## Project Overview
+Python CLI tool that monitors YouTube channels via RSS, extracts transcripts, analyzes with Gemini, and emails fantasy basketball player recommendation newsletters.
+
+## Architecture
+- `src/yt_newsletter/monitor.py` — CLI application with all pipeline logic
+- Root `monitor.py` — shim so `python monitor.py …` works without `pip install -e .`
+- `config.json` — User credentials and channel list (gitignored, created via `yt-newsletter init` or `python -m yt_newsletter init`)
+- `state.json` — Tracks which videos have been processed (gitignored)
+- `history.json` — Stores all analyses for weekly recap aggregation (gitignored)
+
+## Key Commands
+- `yt-newsletter init` (or `python -m yt_newsletter init`) — Create default config.json
+- `yt-newsletter test <youtube-url>` — Test full pipeline on any existing video
+- `yt-newsletter add-channel <name> <channel_id>` — Add a channel to monitor
+- `yt-newsletter monitor` — Start polling loop (every 90 seconds)
+- `yt-newsletter recap` — Send weekly recap email
+
+## Tech Stack
+- Python 3.10+
+- `feedparser` — YouTube RSS parsing
+- `youtube-transcript-api` — Transcript extraction (no API key needed)
+- `google-generativeai` — Gemini API client (`import google.generativeai`)
+- Gmail SMTP — Email delivery
+- No database, all state is JSON files
+
+## Design Decisions
+- RSS over YouTube Data API: free, no quota, faster detection (2-5 min)
+- Packaged under `src/yt_newsletter/`; config/state files stay at repo root
+- Gemini 2.5 Flash: cheapest model that handles transcript analysis well (~$0.01/video)
+- JSON output from Gemini: structured prompt requests raw JSON, stripped of markdown fences
+
+## Config Requirements
+- `gemini_api_key`: from https://aistudio.google.com/apikey
+- `email_app_password`: Gmail App Password (NOT regular password), from https://myaccount.google.com/apppasswords
+- Channel IDs: find via page source on YouTube channel page, search for `channel_id`
+
+## When Modifying
+- The Gemini prompt is in `ANALYSIS_PROMPT` — edit categories there if adding new recommendation types
+- Player scoring weights for weekly recap are in `SCORE_MAP` inside `build_weekly_recap_html()`
+- To add a new sport, duplicate the prompt and adjust player extraction logic
+- Email HTML is inline in `build_email_html()` and `build_weekly_recap_html()`
