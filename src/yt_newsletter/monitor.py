@@ -18,10 +18,13 @@ from email.mime.multipart import MIMEMultipart
 from youtube_transcript_api import YouTubeTranscriptApi
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 # ─── Configuration ───────────────────────────────────────────────────────────
 # Repo root (…/yt-newsletter-pkg/) — config and state files live here, not inside the package.
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+load_dotenv(PROJECT_ROOT / ".env")
 CONFIG_FILE = PROJECT_ROOT / "config.json"
 STATE_FILE = PROJECT_ROOT / "state.json"
 HISTORY_FILE = PROJECT_ROOT / "history.json"
@@ -95,7 +98,14 @@ def load_config():
         CONFIG_FILE.write_text(json.dumps(DEFAULT_CONFIG, indent=2))
         log.info(f"Created default config at {CONFIG_FILE}. Fill it in and restart.")
         raise SystemExit(1)
-    return json.loads(CONFIG_FILE.read_text())
+    cfg = json.loads(CONFIG_FILE.read_text())
+    # Prefer API key from environment or .env (never commit secrets).
+    for env_name in ("GEMINI_API_KEY", "GOOGLE_API_KEY"):
+        key = os.environ.get(env_name, "").strip()
+        if key:
+            cfg["gemini_api_key"] = key
+            break
+    return cfg
 
 def load_state():
     if STATE_FILE.exists():

@@ -21,7 +21,7 @@ yt-newsletter init
 ```
 This creates `config.json`. Fill in:
 
-- **gemini_api_key**: From https://aistudio.google.com/apikey
+- **gemini_api_key**: From https://aistudio.google.com/apikey — or put the key in a `.env` file at the repo root (see `.env.example`) as `GEMINI_API_KEY` or `GOOGLE_API_KEY`; that value overrides `config.json` and is never committed
 - **email_from**: Your Gmail address
 - **email_to**: Where newsletters go (can be same as from)
 - **email_app_password**: Gmail App Password (NOT your regular password)
