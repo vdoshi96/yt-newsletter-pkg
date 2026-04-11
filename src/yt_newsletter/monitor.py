@@ -20,6 +20,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from yt_newsletter.nba_roster import fetch_nba_roster_lines, roster_prompt_section
+
 # ─── Configuration ───────────────────────────────────────────────────────────
 # Repo root (…/yt-newsletter-pkg/) — config and state files live here, not inside the package.
 
@@ -74,6 +76,14 @@ Respond ONLY with valid JSON in this exact format, no markdown fences:
   "key_takeaways": ["takeaway 1", "takeaway 2", "takeaway 3"],
   "timestamp": "when this analysis is relevant (e.g., Week 12, or date range)"
 }
+
+Team assignment:
+- The "team" field must be a standard 2-3 letter NBA team abbreviation (e.g. LAL, BOS) when possible.
+- When the transcript does not clearly state a player's current team, use the OFFICIAL ACTIVE PLAYER LIST below (sourced from the NBA Stats API used by NBA.com) to pick the correct team for that player name.
+- If several names are similar, choose the best match for basketball context. If still unknown, use "TBD".
+
+Official active players (current season — stats.nba.com):
+{roster}
 
 Video title: {title}
 Channel: {channel}
@@ -168,10 +178,14 @@ def analyze_with_gemini(config, title, channel, transcript):
     """Send transcript to Gemini, get structured player analysis."""
     genai.configure(api_key=config["gemini_api_key"])
     model = genai.GenerativeModel(config["gemini_model"])
-    
+
+    roster_lines = fetch_nba_roster_lines(log)
+    roster = roster_prompt_section(roster_lines)
+
     prompt = ANALYSIS_PROMPT.format(
         title=title,
         channel=channel,
+        roster=roster,
         transcript=transcript[:80000]  # trim if massive
     )
     

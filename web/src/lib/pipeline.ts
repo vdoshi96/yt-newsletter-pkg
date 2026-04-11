@@ -2,6 +2,10 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import nodemailer from "nodemailer";
 import { YoutubeTranscript } from "youtube-transcript";
 import { prisma } from "@/lib/prisma";
+import {
+  fetchNbaRosterLinesForPrompt,
+  rosterPromptSection,
+} from "@/lib/nba-roster";
 
 /** Caps transcript size sent to Gemini (cost + context window). Default 80k chars. */
 export function geminiMaxInputChars(): number {
@@ -37,6 +41,14 @@ Respond ONLY with valid JSON in this exact format, no markdown fences:
   "key_takeaways": ["takeaway 1", "takeaway 2", "takeaway 3"],
   "timestamp": "when this analysis is relevant (e.g., Week 12, or date range)"
 }
+
+Team assignment:
+- The "team" field must be a standard 2-3 letter NBA team abbreviation (e.g. LAL, BOS) when possible.
+- When the transcript does not clearly state a player's current team, use the OFFICIAL ACTIVE PLAYER LIST below (sourced from the NBA Stats API used by NBA.com) to pick the correct team for that player name.
+- If several names are similar, choose the best match for basketball context. If still unknown, use "TBD".
+
+Official active players (current season — stats.nba.com):
+{roster}
 
 Video title: {title}
 Channel: {channel}
@@ -134,8 +146,11 @@ export async function analyzeWithGemini(
   const model = genAI.getGenerativeModel({ model: modelName });
 
   const maxInput = geminiMaxInputChars();
+  const rosterLines = await fetchNbaRosterLinesForPrompt();
+  const roster = rosterPromptSection(rosterLines);
   const prompt = ANALYSIS_PROMPT.replace("{title}", title)
     .replace("{channel}", channel)
+    .replace("{roster}", roster)
     .replace("{transcript}", transcript.slice(0, maxInput));
 
   const result = await model.generateContent(prompt);
