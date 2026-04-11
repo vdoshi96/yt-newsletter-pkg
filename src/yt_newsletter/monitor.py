@@ -32,6 +32,8 @@ HISTORY_FILE = PROJECT_ROOT / "history.json"
 DEFAULT_CONFIG = {
     "gemini_api_key": "",
     "gemini_model": "gemini-2.5-flash",
+    # Max new videos to fully process per polling loop iteration (avoids blasting many emails/API calls if a big backlog appears).
+    "max_videos_per_poll_cycle": 1,
     "email_from": "",
     "email_to": "",
     "email_app_password": "",       # Gmail App Password (NOT your regular password)
@@ -390,10 +392,17 @@ def run_monitor(config):
     log.info(f"Monitoring {len(config['channels'])} channels every {interval}s")
     
     while True:
+        max_per_cycle = int(config.get("max_videos_per_poll_cycle", 1) or 1)
+        max_per_cycle = max(1, min(max_per_cycle, 50))
+        processed_this_cycle = 0
         for ch in config["channels"]:
+            if processed_this_cycle >= max_per_cycle:
+                break
             try:
                 videos = get_latest_videos(ch["channel_id"], ch["name"])
                 for video in videos:
+                    if processed_this_cycle >= max_per_cycle:
+                        break
                     vid = video["video_id"]
                     if vid not in state["seen_videos"]:
                         log.info(f"New video detected: {video['title']}")
@@ -404,6 +413,7 @@ def run_monitor(config):
                             "success": result is not None
                         }
                         save_state(state)
+                        processed_this_cycle += 1
             except Exception as e:
                 log.error(f"Error checking {ch['name']}: {e}")
         

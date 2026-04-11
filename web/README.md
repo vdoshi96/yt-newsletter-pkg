@@ -2,6 +2,15 @@
 
 Password-protected dashboard to manage channels, run transcript + Gemini tests (dry run or full), send weekly recap emails, and rely on **Vercel Cron** to poll YouTube RSS (same behavior as the Python CLI).
 
+## Cost & burst protection (defaults)
+
+- **Model:** `gemini-2.5-flash` unless you override `GEMINI_MODEL`.
+- **`MAX_VIDEOS_PER_CRON`** (default **1**): each cron run processes at most this many **new** videos (avoids a flood of emails/Gemini calls if many uploads appear at once). Clamped 1–20.
+- **`MAX_GEMINI_CALLS_PER_UTC_DAY`** (optional): soft daily cap on **saved** analyses (UTC day). Omit or `0` for unlimited.
+- **`GEMINI_MAX_INPUT_CHARS`**: transcript sent to Gemini (default 80k, max 100k).
+
+RSS only ever loads the **latest few videos per channel** (not full back catalog).
+
 ## What you set up (checklist)
 
 1. **PostgreSQL** — [Neon](https://neon.tech), Vercel Postgres, Supabase, etc. Copy the connection string as `DATABASE_URL`.

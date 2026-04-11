@@ -5,6 +5,31 @@ import { processVideo } from "@/lib/pipeline";
 
 export const maxDuration = 120;
 
+/** Prevents one cron run from chewing through a huge backlog (emails + Gemini). */
+function maxVideosPerCron(): number {
+  const raw = process.env.MAX_VIDEOS_PER_CRON;
+  const n = raw === undefined || raw === "" ? 1 : parseInt(raw, 10);
+  if (!Number.isFinite(n)) return 1;
+  return Math.max(1, Math.min(n, 20));
+}
+
+/** Optional daily limit on saved analyses (UTC midnight–midnight). 0 = unlimited. */
+async function analysesCountTodayUtc(): Promise<number> {
+  const start = new Date();
+  start.setUTCHours(0, 0, 0, 0);
+  return prisma.analysis.count({
+    where: { processedAt: { gte: start } },
+  });
+}
+
+function dailyAnalysisCap(): number {
+  const raw = process.env.MAX_GEMINI_CALLS_PER_UTC_DAY;
+  if (raw === undefined || raw === "") return 0;
+  const n = parseInt(raw, 10);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return n;
+}
+
 function authorize(request: Request): boolean {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
@@ -21,6 +46,25 @@ export async function GET(request: Request) {
   if (channels.length === 0) {
     return NextResponse.json({ ok: true, message: "No channels configured", processed: 0 });
   }
+
+  const capPerDay = dailyAnalysisCap();
+  if (capPerDay > 0) {
+    const usedToday = await analysesCountTodayUtc();
+    if (usedToday >= capPerDay) {
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        reason: "daily_analysis_cap",
+        usedToday,
+        capPerDay,
+        message:
+          "Daily MAX_GEMINI_CALLS_PER_UTC_DAY reached; no new videos processed until UTC midnight",
+      });
+    }
+  }
+
+  const perRunLimit = maxVideosPerCron();
+  let processed = 0;
 
   const seenCount = await prisma.seenVideo.count();
   if (seenCount === 0) {
@@ -57,8 +101,22 @@ export async function GET(request: Request) {
     });
   }
 
-  let processed = 0;
   for (const ch of channels) {
+    if (processed >= perRunLimit) break;
+    if (capPerDay > 0) {
+      const usedToday = await analysesCountTodayUtc();
+      if (usedToday >= capPerDay) {
+        return NextResponse.json({
+          ok: true,
+          processed,
+          capped: true,
+          reason: "daily_analysis_cap_mid_run",
+          message:
+            "Stopped early: daily analysis cap reached partway through this cron run",
+        });
+      }
+    }
+
     let videos;
     try {
       videos = await getLatestVideos(ch.channelId, ch.name, 5);
@@ -66,6 +124,19 @@ export async function GET(request: Request) {
       continue;
     }
     for (const video of videos) {
+      if (processed >= perRunLimit) break;
+      if (capPerDay > 0) {
+        const usedToday = await analysesCountTodayUtc();
+        if (usedToday >= capPerDay) {
+          return NextResponse.json({
+            ok: true,
+            processed,
+            capped: true,
+            reason: "daily_analysis_cap_mid_run",
+          });
+        }
+      }
+
       const exists = await prisma.seenVideo.findUnique({
         where: { videoId: video.video_id },
       });
@@ -104,7 +175,12 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, processed });
+  return NextResponse.json({
+    ok: true,
+    processed,
+    perRunLimit,
+    capped: processed >= perRunLimit,
+  });
 }
 
 export async function POST(request: Request) {

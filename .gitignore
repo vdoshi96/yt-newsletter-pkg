@@ -10,3 +10,6 @@ venv/
 *.egg-info/
 dist/
 build/
+
+# Local-only setup notes (do not commit)
+LOCAL_SETUP_CHECKLIST.md

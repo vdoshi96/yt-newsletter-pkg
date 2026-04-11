@@ -3,6 +3,15 @@ import nodemailer from "nodemailer";
 import { YoutubeTranscript } from "youtube-transcript";
 import { prisma } from "@/lib/prisma";
 
+/** Caps transcript size sent to Gemini (cost + context window). Default 80k chars. */
+export function geminiMaxInputChars(): number {
+  const raw = process.env.GEMINI_MAX_INPUT_CHARS;
+  const n =
+    raw === undefined || raw === "" ? 80_000 : parseInt(raw, 10);
+  if (!Number.isFinite(n)) return 80_000;
+  return Math.min(100_000, Math.max(8_000, n));
+}
+
 export const ANALYSIS_PROMPT = `You are a fantasy basketball analyst. Analyze this YouTube video transcript and extract every NBA player mentioned with a recommendation.
 
 For each player, determine the SINGLE best category:
@@ -124,9 +133,10 @@ export async function analyzeWithGemini(
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: modelName });
 
+  const maxInput = geminiMaxInputChars();
   const prompt = ANALYSIS_PROMPT.replace("{title}", title)
     .replace("{channel}", channel)
-    .replace("{transcript}", transcript.slice(0, 80_000));
+    .replace("{transcript}", transcript.slice(0, maxInput));
 
   const result = await model.generateContent(prompt);
   const text = result.response.text();
